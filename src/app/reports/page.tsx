@@ -1,10 +1,11 @@
+
 'use client';
 
 import { useState } from 'react';
 import { DashboardSidebar } from '@/components/layout/sidebar';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FileText, Download, Filter, Calendar as CalendarIcon, FileSpreadsheet, Plus, Loader2, CheckCircle2 } from 'lucide-react';
+import { FileText, Download, Filter, Calendar as CalendarIcon, FileSpreadsheet, Plus, Loader2 } from 'lucide-react';
 import { RECENT_REPORTS } from '@/app/lib/mock-data';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -36,18 +37,96 @@ export default function ReportsPage() {
     setIsGenerating(false);
   };
 
-  const handleDownload = (reportName: string) => {
+  const handleDownload = async (report: any) => {
     toast({
-      title: "Downloading PDF",
-      description: `Preparing ${reportName} for export...`,
+      title: "Generating PDF",
+      description: `Preparing ${report.name} for local download...`,
     });
-    // Simulation of file download
-    setTimeout(() => {
+
+    try {
+      const { jsPDF } = await import('jspdf');
+      const doc = new jsPDF();
+      
+      // Title
+      doc.setFontSize(22);
+      doc.setTextColor(63, 81, 181); // Primary color
+      doc.text("MediSight Insights", 20, 20);
+      
+      doc.setFontSize(16);
+      doc.setTextColor(0, 0, 0);
+      doc.text("Operational Performance Report", 20, 30);
+      
+      // Metadata
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Report ID: ${report.id}`, 20, 45);
+      doc.text(`Generated Date: ${report.date}`, 20, 50);
+      doc.text(`Report Name: ${report.name}`, 20, 55);
+      
+      doc.setDrawColor(200, 200, 200);
+      doc.line(20, 60, 190, 60);
+      
+      // Content
+      if (report.content) {
+        doc.setFontSize(14);
+        doc.setTextColor(0, 0, 0);
+        doc.text("Executive Summary", 20, 75);
+        
+        doc.setFontSize(10);
+        doc.setTextColor(60, 60, 60);
+        const splitSummary = doc.splitTextToSize(report.content.summary, 170);
+        doc.text(splitSummary, 20, 85);
+        
+        let currentY = 85 + (splitSummary.length * 5) + 15;
+        
+        doc.setFontSize(14);
+        doc.setTextColor(0, 0, 0);
+        doc.text("AI Strategic Recommendations", 20, currentY);
+        
+        doc.setFontSize(10);
+        doc.setTextColor(60, 60, 60);
+        currentY += 10;
+        
+        report.content.recommendations.forEach((rec: string, index: number) => {
+          const splitRec = doc.splitTextToSize(`${index + 1}. ${rec}`, 160);
+          doc.text(splitRec, 25, currentY);
+          currentY += (splitRec.length * 5) + 5;
+          
+          if (currentY > 270) {
+            doc.addPage();
+            currentY = 20;
+          }
+        });
+      } else {
+        doc.setFontSize(12);
+        doc.text("Archived Report Data", 20, 75);
+        doc.setFontSize(10);
+        doc.text("This is an legacy archived report. Detailed analytics are available in the central management system.", 20, 85);
+      }
+      
+      // Footer
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`Confidential - MediSight Mumbai Network - Page ${i} of ${pageCount}`, 20, 285);
+      }
+
+      doc.save(`${report.name.replace(/\s+/g, '_')}.pdf`);
+
       toast({
-        title: "Download Complete",
-        description: "The PDF has been saved to your device.",
+        title: "Download Successful",
+        description: "The report PDF has been saved to your device.",
       });
-    }, 1500);
+    } catch (error) {
+      console.error('PDF generation failed:', error);
+      toast({
+        variant: "destructive",
+        title: "Download Failed",
+        description: "Could not generate the PDF file.",
+      });
+    }
   };
 
   return (
@@ -120,9 +199,6 @@ export default function ReportsPage() {
                 <CardTitle>Recent Documents</CardTitle>
                 <CardDescription>Archive of generated operations reports</CardDescription>
               </div>
-              <Button variant="ghost" size="sm" className="gap-2">
-                <Filter className="w-4 h-4" /> Filter All
-              </Button>
             </CardHeader>
             <CardContent className="p-0">
               <div className="divide-y divide-border">
@@ -154,7 +230,7 @@ export default function ReportsPage() {
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      onClick={() => handleDownload(report.name)}
+                      onClick={() => handleDownload(report)}
                       className="gap-2 border-primary/20 hover:bg-primary hover:text-white hover:border-primary transition-all shadow-sm"
                     >
                       <Download className="w-4 h-4" />
