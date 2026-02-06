@@ -1,6 +1,7 @@
 'use server';
 
 import { predictIcuBedShortage, type PredictiveAlertInput } from '@/ai/flows/predict-icu-bed-shortage';
+import { generateHospitalSummary } from '@/ai/flows/generate-hospital-summary';
 import { KPI_TRENDS, DEPT_STATS, HOSPITALS } from './mock-data';
 
 export async function getKpiSummary() {
@@ -18,7 +19,6 @@ export async function getKpiSummary() {
 }
 
 export async function runPredictiveAnalysis(hospitalId: string) {
-  // Real data would come from Firestore
   const input: PredictiveAlertInput = {
     hospitalId,
     occupiedBeds: 420,
@@ -38,6 +38,34 @@ export async function runPredictiveAnalysis(hospitalId: string) {
     return result;
   } catch (error) {
     console.error('Prediction failed:', error);
+    return null;
+  }
+}
+
+export async function generateNewReportAction() {
+  const stats = {
+    occupancy: 84.5,
+    alos: 5.2,
+    revenue: 1250000,
+    criticalDepts: ['Emergency', 'ICU', 'General Medicine'],
+  };
+
+  try {
+    const reportData = await generateHospitalSummary({
+      hospitalName: 'MediSight Main Mumbai',
+      stats,
+    });
+
+    return {
+      id: `rep-${Date.now()}`,
+      name: `AI Ops Summary - ${new Date().toLocaleDateString('en-IN')}`,
+      type: 'PDF',
+      date: new Date().toISOString().split('T')[0],
+      size: '1.2 MB',
+      content: reportData,
+    };
+  } catch (error) {
+    console.error('Report generation failed:', error);
     return null;
   }
 }
